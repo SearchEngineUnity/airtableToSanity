@@ -1,15 +1,22 @@
+import React, {useState} from 'react';
+import {cursor} from '@airtable/blocks';
 import {
   initializeBlock,
   useBase,
   useRecords,
   useGlobalConfig,
   Button,
-  Box
+  Box,
+  useLoadable,
+  useWatchable
 } from '@airtable/blocks/ui';
-import React, {useState} from 'react';
 
-function createOrReplaceEntry(mutations, table) {
-    
+
+
+
+function postToSanity(mutations, table, records) {
+  
+    console.log(mutations)
   let url = "https://hhd5q8cp.api.sanity.io/v1/data/mutate/production";
   fetch(url, {
     method: "POST",
@@ -22,9 +29,14 @@ function createOrReplaceEntry(mutations, table) {
   .then(response => response.json())
   .then(result => {
     if (result.results[0].operation === "delete") {
-      table.updateRecordsAsync([
-        {id: mutations[0].createOrReplace._id, fields: {"published": false}},
-      ])
+      records.forEach(record => {
+        table.updateRecordAsync(record, {
+          "published" :false, "Exclude from Sanity" :true,
+        });
+      })
+      // table.updateRecordsAsync([
+      //   {id: mutations[0].createOrReplace._id, fields: {"published": false}},
+      // ])
     }
 
     table.updateRecordsAsync([
@@ -33,8 +45,14 @@ function createOrReplaceEntry(mutations, table) {
   })
   .catch(error => console.error(error))
 }
+//If a document is being referenced by Sanity it can not be deleted will likely result in 409 error.
+function deleteMutations (records, table) {
+  const mutations = [{"delete": {"query": "*[_type == 'quote']"}}];
 
-function updateMutations(records, table) {
+  postToSanity(mutations, table, records)
+}
+
+function createAndUpdateMutations(records, table) {
   const recordsList = records.map(record => {
     if (record.getCellValueAsString("Exclude from Sanity") === "checked") {
       console.log('excluded')
@@ -75,14 +93,19 @@ function updateMutations(records, table) {
     
   const mutations = recordsList.map(r => removeEmpty(r))
 
-  mutations.forEach(el => {createOrReplaceEntry([el], table)})
+  mutations.forEach(el => {postToSanity([el], table)})
 }
 
 function App() {
   const base = useBase();
   const table = base.getTableByName('quote');
   const records = useRecords(table);
-
+    useLoadable(cursor);
+    useWatchable(cursor, ['selectedRecordIds', 'selectedFieldIds']);
+    
+        console.log({'Selected records': cursor.selectedRecordIds.join(', '),
+        'Selected fields': cursor.selectedFieldIds.join(', ')})
+  
   return (
     <Box
       display="flex"
@@ -96,8 +119,18 @@ function App() {
       height="100vh"
       overflow="hidden"
     >
-      <Button variant="primary" onClick={(e) => {updateMutations(records, table)}} icon="edit">
-        Create or Replace All Records
+      <Button variant="primary" onClick={(e) => {createAndUpdateMutations(records, table)}} icon="edit">
+        Create or Replace All Records in Sanity
+      </Button>
+      <br></br>
+      <br></br>
+      <Button variant="primary" onClick={(e) => {deleteMutations(records, table)}} icon="edit">
+        Delete All Records from Sanity
+      </Button>
+      <br></br>
+      <br></br>
+      <Button variant="primary" onClick={(e) => {deleteMutations(records, table)}} icon="edit">
+        Delete Selected Record from Sanity
       </Button>
     </Box>
   )
