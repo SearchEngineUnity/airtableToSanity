@@ -18,6 +18,7 @@ function postToSanity(mutations, table, records) {
   
     console.log(mutations)
   let url = "https://hhd5q8cp.api.sanity.io/v1/data/mutate/production";
+
   fetch(url, {
     method: "POST",
     headers: {
@@ -37,9 +38,9 @@ function postToSanity(mutations, table, records) {
         });
       })
     }
-
+  let airtableRecordId = mutations[0].createOrReplace.airtableId.split('-')[2]
     table.updateRecordsAsync([
-      {id: mutations[0].createOrReplace._id, fields: {"sanityId": mutations[0].createOrReplace._id, "published": true}},
+      {id: airtableRecordId, fields: {"sanityId": mutations[0].createOrReplace._id, "published": true, "airtableId": mutations[0].createOrReplace.airtableId}},
     ])
   })
   .catch(error => console.error(error))
@@ -51,18 +52,19 @@ function deleteMutations (records, table) {
   postToSanity(mutations, table, records)
 }
 
-function createAndUpdateMutations(records, table) {
+function createAndUpdateMutations(records, table, baseId, tableId) {
   const recordsList = records.map(record => {
     if (record.getCellValueAsString("Exclude from Sanity") === "checked") {
       console.log('excluded')
       return {}
     }
     
-    let id = record.getCellValueAsString('sanityId')? record.getCellValueAsString('sanityId') : record.id
+    let id = record.getCellValueAsString('sanityId')? record.getCellValueAsString('sanityId') : `${baseId}-${tableId}-${record.id}`
 
     return {
     "createOrReplace": {
     '_id': id,
+    'airtableId': `${baseId}-${tableId}-${record.id}`,
     '_type': "quote",
     'text': record.getCellValueAsString('text') || null,
     'source': record.getCellValueAsString('source') || null,
@@ -100,6 +102,8 @@ function createAndUpdateMutations(records, table) {
 function App() {
   const base = useBase();
   const table = base.getTableByName('quote');
+  const baseId = base._id
+  const tableId = table._id
   const records = useRecords(table);
     useLoadable(cursor);
     useWatchable(cursor, ['selectedRecordIds', 'selectedFieldIds']);
@@ -120,7 +124,7 @@ function App() {
       height="100vh"
       overflow="hidden"
     >
-      <Button variant="primary" onClick={(e) => {createAndUpdateMutations(records, table)}} icon="edit">
+      <Button variant="primary" onClick={(e) => {createAndUpdateMutations(records, table, baseId, tableId)}} icon="edit">
         Create or Replace All Records in Sanity
       </Button>
       <br></br>
