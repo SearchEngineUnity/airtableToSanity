@@ -31,16 +31,15 @@ function postToSanity(mutations, table, records) {
     if (result.results[0].operation === "delete") {
       records.forEach(record => {
         table.updateRecordAsync(record, {
-          "published" :false, "Exclude from Sanity" :true,
+          "published" :false, 
+          "Exclude from Sanity" :true, 
+          "sanityId": '',
         });
       })
-      // table.updateRecordsAsync([
-      //   {id: mutations[0].createOrReplace._id, fields: {"published": false}},
-      // ])
     }
 
     table.updateRecordsAsync([
-      {id: mutations[0].createOrReplace._id, fields: {"published": true}},
+      {id: mutations[0].createOrReplace._id, fields: {"sanityId": mutations[0].createOrReplace._id, "published": true}},
     ])
   })
   .catch(error => console.error(error))
@@ -59,9 +58,11 @@ function createAndUpdateMutations(records, table) {
       return {}
     }
     
+    let id = record.getCellValueAsString('sanityId')? record.getCellValueAsString('sanityId') : record.id
+
     return {
     "createOrReplace": {
-    '_id': record.id || null,
+    '_id': id,
     '_type': "quote",
     'text': record.getCellValueAsString('text') || null,
     'source': record.getCellValueAsString('source') || null,
